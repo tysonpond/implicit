@@ -18,7 +18,6 @@ from .utils import check_random_state
 
 def train_test_split(ratings, train_percentage=0.8, random_state=None):
     """ Randomly splits the ratings matrix into two matrices for training/testing.
-
     Parameters
     ----------
     ratings : coo_matrix
@@ -57,7 +56,6 @@ def train_test_split(ratings, train_percentage=0.8, random_state=None):
 def precision_at_k(model, train_user_items, test_user_items, int K=10,
                    show_progress=True, int num_threads=1):
     """ Calculates P@K for a given trained model
-
     Parameters
     ----------
     model : RecommenderBase
@@ -77,7 +75,6 @@ def precision_at_k(model, train_user_items, test_user_items, int K=10,
         to the number of cores on the machine. Note: aside from the ALS and BPR
         models, setting this to more than 1 will likely hurt performance rather than
         help.
-
     Returns
     -------
     float
@@ -91,7 +88,6 @@ def precision_at_k(model, train_user_items, test_user_items, int K=10,
 def mean_average_precision_at_k(model, train_user_items, test_user_items, int K=10,
                                 show_progress=True, int num_threads=1):
     """ Calculates MAP@K for a given trained model
-
     Parameters
     ----------
     model : RecommenderBase
@@ -109,7 +105,6 @@ def mean_average_precision_at_k(model, train_user_items, test_user_items, int K=
         to the number of cores on the machine. Note: aside from the ALS and BPR
         models, setting this to more than 1 will likely hurt performance rather than
         help.
-
     Returns
     -------
     float
@@ -123,7 +118,6 @@ def mean_average_precision_at_k(model, train_user_items, test_user_items, int K=
 def ndcg_at_k(model, train_user_items, test_user_items, int K=10,
               show_progress=True, int num_threads=1):
     """ Calculates ndcg@K for a given trained model
-
     Parameters
     ----------
     model : RecommenderBase
@@ -141,7 +135,6 @@ def ndcg_at_k(model, train_user_items, test_user_items, int K=10,
         to the number of cores on the machine. Note: aside from the ALS and BPR
         models, setting this to more than 1 will likely hurt performance rather than
         help.
-
     Returns
     -------
     float
@@ -155,7 +148,6 @@ def ndcg_at_k(model, train_user_items, test_user_items, int K=10,
 def AUC_at_k(model, train_user_items, test_user_items, int K=10,
              show_progress=True, int num_threads=1):
     """ Calculate limited AUC for a given trained model
-
     Parameters
     ----------
     model : RecommenderBase
@@ -173,7 +165,6 @@ def AUC_at_k(model, train_user_items, test_user_items, int K=10,
         to the number of cores on the machine. Note: aside from the ALS and BPR
         models, setting this to more than 1 will likely hurt performance rather than
         help.
-
     Returns
     -------
     float
@@ -187,7 +178,6 @@ def AUC_at_k(model, train_user_items, test_user_items, int K=10,
 def ranking_metrics_at_k(model, train_user_items, test_user_items, int K=10,
                          show_progress=True, int num_threads=1):
     """ Calculates ranking metrics for a given trained model
-
     Parameters
     ----------
     model : RecommenderBase
@@ -207,7 +197,6 @@ def ranking_metrics_at_k(model, train_user_items, test_user_items, int K=10,
         to the number of cores on the machine. Note: aside from the ALS and BPR
         models, setting this to more than 1 will likely hurt performance rather than
         help.
-
     Returns
     -------
     float
@@ -222,9 +211,9 @@ def ranking_metrics_at_k(model, train_user_items, test_user_items, int K=10,
     cdef int users = test_user_items.shape[0], items = test_user_items.shape[1]
     cdef int u, i
     # precision
-    cdef double relevant = 0, pr_div = 0, total = 0
+    cdef double relevant = 0, pr_div = 0, pr_div_correct = 0, rec_div_correct = 0, total = 0
     # map
-    cdef double mean_ap = 0, ap = 0
+    cdef double mean_ap = 0, mean_ap_correct = 0, ap = 0
     # ndcg
     cdef double[:] cg = (1.0 / np.log2(np.arange(2, K + 2)))
     cdef double[:] cg_sum = np.cumsum(cg)
@@ -265,6 +254,8 @@ def ranking_metrics_at_k(model, train_user_items, test_user_items, int K=10,
                     likes.insert(test_indices[i])
 
                 pr_div += fmin(K, likes.size())
+                pr_div_correct += K
+                rec_div_correct += likes.size()
                 ap = 0
                 hit = 0
                 miss = 0
@@ -284,6 +275,7 @@ def ranking_metrics_at_k(model, train_user_items, test_user_items, int K=10,
                         auc += hit
                 auc += ((hit + num_pos_items) / 2.0) * (num_neg_items - miss)
                 mean_ap += ap / fmin(K, likes.size())
+                mean_ap_correct += ap / K
                 mean_auc += auc / (num_pos_items * num_neg_items)
                 total += 1
         finally:
@@ -295,5 +287,8 @@ def ranking_metrics_at_k(model, train_user_items, test_user_items, int K=10,
         "precision": relevant / pr_div,
         "map": mean_ap / total,
         "ndcg": ndcg / total,
-        "auc": mean_auc / total
+        "auc": mean_auc / total,
+        "precision_correct": relevant / pr_div_correct,
+        "recall_correct": relevant / rec_div_correct,
+        "map_correct": mean_ap_correct / total
     }
